@@ -42,7 +42,7 @@ The Dining Philosophers problem demonstrates challenges in concurrent programmin
 
 ## How to Use
 
-1. Open `Final code for OS.html` in any modern web browser
+1. Open `dining_philosophers.html` in any modern web browser
 2. Click "Start" to begin the simulation
 3. Observe philosophers cycling through states
 4. Use controls to pause, reset, or adjust speed
@@ -77,6 +77,6 @@ Works in all modern browsers supporting ES6+ features:
 
 ## File Structure
 
-- `Final code for OS.html`: Single self-contained HTML file with embedded CSS and JavaScript
+- `dining_philosophers.html`: Single self-contained HTML file with embedded CSS and JavaScript
 
 No external dependencies required.
