@@ -1,0 +1,555 @@
+!doctype html
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Dining Philosophers — Visual Simulator (Terminal-style Log)</title>
+  <style>
+    /* ===============================
+   Root Variables
+================================ */
+:root {
+  --bg: #071022;
+  --fg: #e6eef8;
+  --muted: #9aa4b2;
+
+  --accent: #60a5fa;
+  --think: #f59e0b;
+  --eat: #16a34a;
+  --hungry: #ef4444;
+}
+
+/* ===============================
+   Base Layout
+================================ */
+html,
+body {
+  height: 100%;
+  margin: 0;
+  font-family: Inter, Segoe UI, Roboto, Arial, sans-serif;
+  background: linear-gradient(#071022, #081827);
+  color: var(--fg);
+}
+
+/* ===============================
+   Main Container
+================================ */
+.app {
+  max-width: 1100px;
+  margin: 28px auto;
+  padding: 18px;
+  display: grid;
+  grid-template-columns: 1fr 360px;
+  gap: 16px;
+  border-radius: 12px;
+}
+
+/* ===============================
+   Cards & Panels
+================================ */
+.card {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.03);
+  border-radius: 10px;
+  padding: 12px;
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 520px;
+}
+
+/* ===============================
+   Table & Layout Elements
+================================ */
+.table {
+  width: 520px;
+  height: 520px;
+  border-radius: 50%;
+  margin: 0 auto;
+  position: relative;
+  background: transparent;
+}
+
+/* ===============================
+   Philosopher Nodes
+================================ */
+.philosopher {
+  width: 110px;
+  height: 110px;
+  position: absolute;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+
+  text-align: center;
+  font-size: 13px;
+  color: var(--fg);
+
+  border: 2px solid rgba(255, 255, 255, 0.03);
+  transition: all 0.22s ease;
+}
+
+.philosopher .name {
+  font-weight: 700;
+}
+
+.dot {
+  width: 14px;
+  height: 14px;
+  margin-top: 6px;
+  border-radius: 50%;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+}
+
+/* ===============================
+   Philosopher States
+================================ */
+.state-thinking {
+  background: linear-gradient(
+    180deg,
+    rgba(245, 158, 11, 0.12),
+    rgba(245, 158, 11, 0.04)
+  );
+  border-color: rgba(245, 158, 11, 0.18);
+}
+
+.state-eating {
+  background: linear-gradient(
+    180deg,
+    rgba(16, 185, 129, 0.12),
+    rgba(16, 185, 129, 0.04)
+  );
+  border-color: rgba(16, 185, 129, 0.18);
+}
+
+.state-hungry {
+  background: linear-gradient(
+    180deg,
+    rgba(239, 68, 68, 0.12),
+    rgba(239, 68, 68, 0.04)
+  );
+  border-color: rgba(239, 68, 68, 0.18);
+}
+
+.state-finished {
+  opacity: 0.7;
+  transform: scale(0.96);
+}
+
+/* ===============================
+   Chopsticks
+================================ */
+.chopstick {
+  width: 10px;
+  height: 80px;
+  position: absolute;
+  border-radius: 6px;
+  background: linear-gradient(180deg, #b08968, #7c4a2f);
+  transition: all 0.18s ease;
+}
+
+.chopstick.busy {
+  filter: brightness(0.85);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.6);
+  transform: scale(1.02);
+}
+
+/* ===============================
+   Controls & UI
+================================ */
+.controls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+button {
+  background: var(--accent);
+  border: none;
+  color: #042235;
+  font-weight: 700;
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+button.ghost {
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid rgba(255, 255, 255, 0.03);
+  box-shadow: none;
+}
+
+input[type="range"] {
+  width: 160px;
+}
+
+/* ===============================
+   Utility Components
+================================ */
+.statusbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.terminal {
+  background: #041123;
+  border-radius: 6px;
+  padding: 8px;
+  height: 360px;
+  overflow: auto;
+  font-family: monospace;
+  color: #cfe9ff;
+  border: 1px solid rgba(255, 255, 255, 0.02);
+  white-space: pre-wrap;
+}
+
+.row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.chip {
+  background: rgba(255, 255, 255, 0.02);
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.02);
+}
+
+.tiny {
+  font-size: 12px;
+  color: var(--muted);
+}
+  </style>
+</head>
+<body>
+  <div class="app card" role="application" aria-label="Dining Philosophers Simulator">
+    <div>
+      <div class="table card" id="table"></div>
+    </div>
+
+    <div class="panel card" aria-live="polite">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div style="display:flex;gap:8px;align-items:center">
+          <button id="startBtn">Start</button>
+          <button id="pauseBtn" class="ghost" disabled>Pause</button>
+          <button id="resetBtn" class="ghost">Reset</button>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <div class="tiny">Philosophers: <span id="nValue">5</span></div>
+          <div class="tiny">Eats each: <span id="limitValue">3</span></div>
+        </div>
+      </div>
+
+      <div class="row">
+        <label class="tiny">Speed</label>
+        <input id="speed" type="range" min="0.2" max="2" step="0.05" value="1">
+        <div class="chip tiny" id="speedValue">1.00x</div>
+      </div>
+
+      <div class="row">
+        <label class="tiny">Think (s)</label>
+        <input id="thinkTime" type="number" min="0" max="10" step="0.5" value="1" style="width:80px">
+        <label class="tiny">Eat (s)</label>
+        <input id="eatTime" type="number" min="0" max="10" step="0.5" value="2" style="width:80px">
+      </div>
+
+      <div class="statusbar">
+        <div class="tiny">Room cap: <span id="roomCap">4</span></div>
+        <div class="tiny">In room: <span id="roomIn">0</span></div>
+        <div class="tiny">Chop busy: <span id="busyCount">0</span></div>
+      </div>
+
+      <div class="terminal" id="terminal" role="log" aria-live="polite" aria-atomic="false"></div>
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div class="tiny">Logs kept: <span id="logCount">0</span></div>
+        <div style="display:flex;gap:8px">
+          <button id="clearLog" class="ghost">Clear</button>
+          <button id="downloadLog" class="ghost">Export</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+/* Improved Dining Philosophers visual simulator with terminal-style log.
+   - Terminal appends at bottom and auto-scrolls.
+   - Keeps a bounded log buffer (configurable).
+   - Robust start/pause/reset transitions and immediate stop on reset.
+*/
+
+const cfg = { N:5, EAT_LIMIT:3, MAX_LOG_LINES: 2000 };
+
+let philosophers = [], chopsticks = [];
+let roomCount = cfg.N - 1;
+let running = false, paused = false;
+let speed = 1, thinkBase = 1000, eatBase = 2000;
+let terminalEl = document.getElementById('terminal');
+let logLines = []; // store plain-text lines
+
+// UI refs
+const startBtn = document.getElementById('startBtn');
+const pauseBtn = document.getElementById('pauseBtn');
+const resetBtn = document.getElementById('resetBtn');
+const speedSlider = document.getElementById('speed');
+const speedValue = document.getElementById('speedValue');
+const thinkInput = document.getElementById('thinkTime');
+const eatInput = document.getElementById('eatTime');
+const roomCapEl = document.getElementById('roomCap');
+const roomInEl = document.getElementById('roomIn');
+const busyCountEl = document.getElementById('busyCount');
+const nValue = document.getElementById('nValue');
+const limitValue = document.getElementById('limitValue');
+const logCount = document.getElementById('logCount');
+const clearLogBtn = document.getElementById('clearLog');
+const downloadLogBtn = document.getElementById('downloadLog');
+
+nValue.textContent = cfg.N; limitValue.textContent = cfg.EAT_LIMIT;
+roomCapEl.textContent = cfg.N - 1;
+
+// ---------- Logging (terminal-like) ----------
+function appendLog(text){
+  const t = new Date().toLocaleTimeString();
+  const line = `[${t}] ${text}`;
+  logLines.push(line);
+  // Trim buffer if exceeded
+  if (logLines.length > cfg.MAX_LOG_LINES) logLines.shift();
+  // Efficient append: create text node + line break
+  const node = document.createElement('div');
+  node.textContent = line;
+  terminalEl.appendChild(node);
+  logCount.textContent = logLines.length;
+  // Auto-scroll to bottom
+  terminalEl.scrollTop = terminalEl.scrollHeight;
+}
+// convenience
+function log(msg){ appendLog(msg); }
+
+// ---------- Build world DOM ----------
+const table = document.getElementById('table');
+function clearTableDOM(){ table.innerHTML = ''; }
+function buildWorld(){
+  clearTableDOM();
+  philosophers = []; chopsticks = [];
+  const N = cfg.N;
+  const dim = 520; const center = dim/2; const radius = 200;
+
+  // create chopsticks first
+  for(let i=0;i<N;i++){
+    const stick = document.createElement('div');
+    stick.className = 'chopstick';
+    table.appendChild(stick);
+    chopsticks.push({busy:false, el: stick});
+  }
+
+  for(let i=0;i<N;i++){
+    const el = document.createElement('div');
+    el.className = 'philosopher state-thinking';
+    el.innerHTML = `<div class="name">P${i}</div><div class="dot"></div><div class="tiny" style="margin-top:6px;color:var(--muted);font-size:12px">thinking</div>`;
+    table.appendChild(el);
+    philosophers.push({id:i, state:'thinking', eaten:0, el, statusLine: el.querySelector('.tiny')});
+  }
+
+  // position
+  for(let i=0;i<N;i++){
+    const angle = (i / N) * Math.PI * 2 - Math.PI/2;
+    const x = center + Math.cos(angle)*radius;
+    const y = center + Math.sin(angle)*radius;
+    const p = philosophers[i];
+    p.el.style.left = `${x}px`; p.el.style.top = `${y}px`;
+
+    const midAngle = angle + (Math.PI / N);
+    const sx = center + Math.cos(midAngle)*(radius - 60);
+    const sy = center + Math.sin(midAngle)*(radius - 60);
+    const stick = chopsticks[i];
+    stick.el.style.left = `${sx}px`; stick.el.style.top = `${sy}px`;
+    const deg = midAngle*180/Math.PI + 90;
+    stick.el.style.transform = `rotate(${deg}deg)`;
+  }
+  updateStatusIndicators();
+}
+
+// ---------- Sleep (aware of running & paused) ----------
+function sleep(ms){
+  // returns a promise that resolves early if running becomes false
+  return new Promise(resolve => {
+    const start = performance.now();
+    function step(){
+      if (!running){ return resolve('stopped'); } // immediate exit on reset
+      if (paused){ setTimeout(step, 120); return; }
+      const elapsed = performance.now() - start;
+      if (elapsed >= ms / speed) return resolve('ok');
+      setTimeout(step, 80);
+    }
+    setTimeout(step, 80);
+  });
+}
+
+// ---------- Resource acquisition ----------
+function tryAcquire(pid){
+  const N = cfg.N;
+  const left = pid, right = (pid+1)%N;
+  if (roomCount <= 0) return false;
+  if (chopsticks[left].busy || chopsticks[right].busy) return false;
+  // acquire atomically (logical)
+  roomCount--; chopsticks[left].busy = true; chopsticks[right].busy = true;
+  return true;
+}
+function release(pid){
+  const N = cfg.N;
+  const left = pid, right = (pid+1)%N;
+  if (chopsticks[left].busy) chopsticks[left].busy = false;
+  if (chopsticks[right].busy) chopsticks[right].busy = false;
+  roomCount++;
+  if (roomCount > cfg.N - 1) roomCount = cfg.N - 1;
+}
+
+// ---------- Renderer ----------
+function renderPhilosopher(p){
+  p.el.classList.remove('state-thinking','state-hungry','state-eating','state-finished');
+  p.el.classList.add(`state-${p.state}`);
+  p.statusLine.textContent = p.state + (p.state === 'eating' ? ` (${p.eaten}/${cfg.EAT_LIMIT})` : p.state === 'finished' ? ` (${p.eaten}/${cfg.EAT_LIMIT})` : '');
+  const dot = p.el.querySelector('.dot');
+  if (p.state === 'thinking') dot.style.background = 'var(--think)';
+  else if (p.state === 'hungry') dot.style.background = 'var(--hungry)';
+  else if (p.state === 'eating') dot.style.background = 'var(--eat)';
+  else dot.style.background = 'rgba(255,255,255,0.12)';
+
+  // chopstick visuals
+  for(let i=0;i<cfg.N;i++){
+    chopsticks[i].el.classList.toggle('busy', chopsticks[i].busy);
+  }
+}
+function updateStatusIndicators(){
+  busyCountEl.textContent = chopsticks.filter(s=>s.busy).length;
+  roomInEl.textContent = (cfg.N - 1) - roomCount;
+}
+
+// ---------- Philosopher lifecycle ----------
+async function philosopherLoop(p){
+  // run until eaten enough or global stop
+  while (running && p.eaten < cfg.EAT_LIMIT){
+    p.state = 'thinking'; renderPhilosopher(p); log(`P${p.id} is thinking`);
+    let res = await sleep(thinkBase);
+    if (!running) break;
+
+    p.state = 'hungry'; renderPhilosopher(p); log(`P${p.id} is hungry and tries to enter room`);
+
+    // try to acquire resources
+    while (running && p.eaten < cfg.EAT_LIMIT){
+      if (paused){ await sleep(200); continue; }
+      const ok = tryAcquire(p.id);
+      updateStatusIndicators();
+      if (ok){
+        p.state = 'eating'; renderPhilosopher(p);
+        log(`P${p.id} started eating (${p.eaten+1}/${cfg.EAT_LIMIT})`);
+        res = await sleep(eatBase);
+        if (!running) { release(p.id); updateStatusIndicators(); break; }
+        p.eaten++;
+        release(p.id); updateStatusIndicators();
+        log(`P${p.id} finished eating (${p.eaten}/${cfg.EAT_LIMIT})`);
+        break;
+      } else {
+        // randomized backoff to avoid livelock
+        await sleep(180 + Math.random()*300);
+      }
+    }
+
+    // small cooldown between cycles
+    await sleep(150);
+  }
+
+  if (p.eaten >= cfg.EAT_LIMIT){
+    p.state = 'finished'; renderPhilosopher(p);
+    log(`P${p.id} has finished all meals and left the table.`);
+  }
+}
+
+// ---------- Controls ----------
+startBtn.addEventListener('click', () => {
+  if (running) return;
+  running = true; paused = false;
+  startBtn.disabled = true; pauseBtn.disabled = false; pauseBtn.classList.remove('ghost'); pauseBtn.textContent = 'Pause';
+  log('Simulation started');
+  buildWorld();
+  // start loops
+  for(let i=0;i<cfg.N;i++){
+    renderPhilosopher(philosophers[i]);
+    philosopherLoop(philosophers[i]);
+  }
+  // tick for status updates
+  (function tick(){
+    if (!running) return;
+    updateStatusIndicators();
+    requestAnimationFrame(tick);
+  })();
+});
+
+pauseBtn.addEventListener('click', () => {
+  if (!running) return;
+  paused = !paused;
+  pauseBtn.textContent = paused ? 'Resume' : 'Pause';
+  pauseBtn.classList.toggle('ghost', !paused);
+  log(paused ? 'Simulation paused' : 'Simulation resumed');
+});
+
+resetBtn.addEventListener('click', () => {
+  if (!running){
+    // just rebuild world & reset logs if desired
+    roomCount = cfg.N - 1;
+    buildWorld();
+    log('Environment reset (idle).');
+    return;
+  }
+  // stop simulation
+  running = false;
+  paused = false;
+  startBtn.disabled = false; pauseBtn.disabled = true; pauseBtn.classList.add('ghost'); pauseBtn.textContent = 'Pause';
+  // release all chopsticks & reset counts immediately to keep UI consistent
+  for(let s of chopsticks) s.busy = false;
+  roomCount = cfg.N - 1;
+  buildWorld();
+  log('Simulation reset (stopped).');
+});
+
+// speed / times
+speedSlider.addEventListener('input', e => { speed = parseFloat(e.target.value); speedValue.textContent = speed.toFixed(2) + 'x'; });
+thinkInput.addEventListener('change', ()=> thinkBase = Math.max(0, parseFloat(thinkInput.value) || 1) * 1000);
+eatInput.addEventListener('change', ()=> eatBase = Math.max(0, parseFloat(eatInput.value) || 2) * 1000);
+
+// clear log
+clearLogBtn.addEventListener('click', () => {
+  logLines = []; terminalEl.innerHTML = ''; logCount.textContent = 0; log('Logs cleared');
+});
+
+// download log as txt
+downloadLogBtn.addEventListener('click', () => {
+  const blob = new Blob([logLines.join('\n')], {type:'text/plain'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = 'dining_philosophers_log.txt';
+  document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+});
+
+// init
+(function init(){
+  thinkBase = parseFloat(thinkInput.value) * 1000;
+  eatBase = parseFloat(eatInput.value) * 1000;
+  speed = parseFloat(speedSlider.value);
+  speedValue.textContent = speed.toFixed(2) + 'x';
+  buildWorld();
+  log('Ready — press Start to run the simulation.');
+})();
+</script>
+</body>
+</html>
